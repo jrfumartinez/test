@@ -1,0 +1,37 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cmake",
+			"label": "CMake: limpiar",
+			"command": "clean",
+			"preset": "__defaultBuildPreset__",
+			"problemMatcher": [],
+			"detail": "Tarea limpiar plantilla de CMake"
+		},
+		{
+			"type": "cmake",
+			"label": "CMake: recompilación limpia",
+			"command": "cleanRebuild",
+			"targets": [
+				"all"
+			],
+			"preset": "__defaultBuildPreset__",
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "Tarea recompilación limpia plantilla de CMake"
+		},
+		{
+			"type": "cmake",
+			"label": "CMake: compilación",
+			"command": "build",
+			"targets": [
+				"all"
+			],
+			"preset": "__defaultBuildPreset__",
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "Tarea compilación plantilla de CMake"
+		}
+	]
+}
