@@ -1,5 +1,6 @@
 
 #include "ap.h"
+#include "interpolation.h"
 #include "netcdf.h"
 #include <algorithm>
 #include <bits/stdc++.h>
@@ -10,6 +11,7 @@
 #include <cstring>
 #include <ctime>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdio.h>
@@ -26,15 +28,21 @@ void handle_error(int status, int Paso);
 inline void ltrim(std::string &s);
 inline void rtrim(std::string &s);
 clock_t Timestamp();
-string Ruta, NomVar;
-double LBound = -1, RBound = -1;
-int Ntimes = 3, TipoSp = -1;
-int var_id, var_ndims, var_dimids[NC_MAX_VAR_DIMS], var_natts;
-nc_type var_type;
-int status, ncid;
 
 int main(int, char **) {
   std::cout << "Hello, from test!\n";
+  string Ruta, NomFich, NomVar;
+  double LBound = -1, RBound = -1;
+  int Ntimes = 3, TipoSp = -1;
+  int var_id, var_ndims, var_dimids[NC_MAX_VAR_DIMS], var_natts;
+  nc_type var_type;
+  int status, ncid;
+  string Nombres[3];
+  size_t Tamanhos[3];
+  double data_val_d;
+  float data_val_f;
+  int data_val_i;
+  size_t var_index[3];
 
   try {
     ifstream config("DiffMotion.cfig");
@@ -44,24 +52,28 @@ int main(int, char **) {
     if (config.is_open()) {
       while (getline(config, cadena)) {
         if (Iterador == 0) {
-          Ruta = cadena;
+          NomFich = cadena;
         } else if (Iterador == 1) {
-          Ntimes = stoi(cadena);
+          Ruta = cadena;
         } else if (Iterador == 2) {
-          NomVar = cadena;
+          Ntimes = stoi(cadena);
         } else if (Iterador == 3) {
+          NomVar = cadena;
+        } else if (Iterador == 4) {
           transform(cadena.cbegin(), cadena.cend(), cadena.begin(),
                     to_uppercase);
           if (cadena == "NATURAL") {
             TipoSp = 1;
           } else if (cadena == "PARABOLIC") {
             TipoSp = 2;
-          } else if (cadena == "CLAMPED") {
+          } else if (cadena == "CLAMPED_1D") {
             TipoSp = 3;
+          } else if (cadena == "CLAMPED_2D") {
+            TipoSp = 4;
           }
           if (TipoSp == -1)
             throw "err: No hay un tipo válido de spline.";
-        } else if (Iterador == 4 && TipoSp == 3) {
+        } else if (Iterador == 5 && TipoSp == 3) {
           stringstream Cadena(cadena);
           string token;
           int Iterador_2 = 0;
@@ -81,12 +93,22 @@ int main(int, char **) {
         Iterador++;
       }
     }
-    char ruta[Ruta.length() + 1];
-    strcpy(ruta, Ruta.c_str());
+    if (Ruta.back() != '/')
+      Ruta += "/";
+    size_t Punto = NomFich.find_last_of('.');
+    string NomFich2 = NomFich.insert(Punto - 1, "_Dif");
+    string InFich = Ruta + "/" + NomFich;
+    string OutFich = Ruta + "/" + NomFich2;
+    filesystem::copy_file(InFich, OutFich);
+
+    char inruta[InFich.length() + 1];
+    strcpy(inruta, InFich.c_str());
+    char outruta[OutFich.length() + 1];
+    strcpy(outruta, OutFich.c_str());
     char nomvar[NomVar.length() + 1];
     strcpy(nomvar, NomVar.c_str());
 
-    status = nc_open(ruta, 0, &ncid);
+    status = nc_open(inruta, 0, &ncid);
     if (status != NC_NOERR)
       handle_error(status, 1);
     status = nc_inq_varid(ncid, nomvar, &var_id);
@@ -98,13 +120,8 @@ int main(int, char **) {
       handle_error(status, 3);
     if (var_ndims != 3)
       throw "El numero de dimensiones es distinto de tres.";
-    if (var_type == NC_FLOAT) {
-    } else if (var_type == NC_DOUBLE) {
-    } else
+    if (var_type != NC_FLOAT && var_type != NC_DOUBLE && var_type != NC_INT)
       throw "Variable de tipo no soportado.";
-
-    string Nombres[var_ndims];
-    size_t Tamanhos[var_ndims];
 
     for (int i = 0; i < var_ndims; i++) {
       size_t recs;
@@ -117,77 +134,61 @@ int main(int, char **) {
       rtrim(Nombres[i]);
       Tamanhos[i] = recs;
     }
-    /*
-    const size_t NDIM = 3;
-    float Var_valoresf[Tamanhos[1] * Tamanhos[2] * Tamanhos[0]];
-    double Var_valoresd[Tamanhos[1] * Tamanhos[2] * Tamanhos[0]];
-    static size_t startp[NDIM];
-    static size_t countp[NDIM];
-    static ptrdiff_t stridep[NDIM];
-    static ptrdiff_t imapp[NDIM];
+    double Datas[Tamanhos[0]], Abscisas[Tamanhos[0]];
 
-    for (int i = 0; i < 3; i++) {
-      startp[i] = 0;
-      stridep[i] = 1;
-      countp[i] = Tamanhos[i];
-    }
-    imapp[0] = Tamanhos[1];
-    imapp[1] = 1;
-    imapp[2] = Tamanhos[0];
+    for (int i = 0; i < Tamanhos[1]; i++) {
+      var_index[1] = i;
+      for (int m = 0; m < Tamanhos[2]; m++) {
+        var_index[2] = m;
+        for (int n = 0; n < Tamanhos[0]; n++) {
+          Abscisas[n] = n;
+          var_index[0] = n;
+          if (var_type == NC_FLOAT) {
+            status = nc_get_var1_float(ncid, var_id, var_index, &data_val_f);
+            Datas[n] = data_val_f;
+          } else if (var_type == NC_DOUBLE) {
+            status = nc_get_var1_double(ncid, var_id, var_index, &data_val_d);
+            Datas[n] = data_val_f;
+          } else if (var_type == NC_INT) {
+            status = nc_get_var1_int(ncid, var_id, var_index, &data_val_i);
+            Datas[n] = data_val_f;
+          }
+          if (status != NC_NOERR)
+            handle_error(status, 5);
+        }
+        alglib::real_1d_array data;
+        data.setcontent(Tamanhos[0], Datas);
+        alglib::real_1d_array abscisas;
+        data.setcontent(Tamanhos[0], Abscisas);
+        alglib::real_1d_array yes, dyes;
 
-    if (var_type == NC_FLOAT) {
-      nc_get_varm_float(ncid, var_id, startp, countp, stridep, imapp,
-                        Var_valoresf);
-      if (status != NC_NOERR)
-        handle_error(status, 5);
-    } else if (var_type == NC_DOUBLE) {
-      nc_get_varm_double(ncid, var_id, startp, countp, stridep, imapp,
-                         Var_valoresd);
-      if (status != NC_NOERR)
-        handle_error(status, 5);
+        if (TipoSp == 1) { // Parabólica
+          alglib::spline1dconvdiffcubic(abscisas, data, Tamanhos[0], 0, 0, 0, 0,
+                                        abscisas, Tamanhos[0], yes, dyes);
+        }
+        if (TipoSp == 2) { // Natural
+          alglib::spline1dconvdiffcubic(abscisas, data, Tamanhos[0], 2, 0, 2, 0,
+                                        abscisas, Tamanhos[0], yes, dyes);
+        }
+        if (TipoSp == 3) { // Clamped1d
+          alglib::spline1dconvdiffcubic(abscisas, data, Tamanhos[0], 1, LBound,
+                                        1, RBound, abscisas, Tamanhos[0], yes,
+                                        dyes);
+        }
+        if (TipoSp == 4) { // Clamped2d
+          alglib::spline1dconvdiffcubic(abscisas, data, Tamanhos[0], 2, LBound,
+                                        2, RBound, abscisas, Tamanhos[0], yes,
+                                        dyes);
+        }
+        // status = nc_put_var1_double(ncid, rh_id, rh_index, &rh_val);
+        if (status != NC_NOERR)
+          handle_error(status, 6);
+      }
     }
-    */
   } catch (exception e) {
     exit(EXIT_FAILURE);
   }
-  // Source - https://stackoverflow.com/a/42544
-  // Posted by 1800 INFORMATION, modified by community. See post 'Timeline' for
-  // change history Retrieved 2026-08-07, License - CC BY-SA 3.0
-  id_t c_pid = fork();
-  if (c_pid == -1) {
-    perror("fork");
-    exit(EXIT_FAILURE);
-  } else if (c_pid > 0) {
-    //  wait(nullptr);
-    cout << "printed from parent process " << getpid() << endl;
-    throw "err: No se pudo iniciar el proceso de NCO.";
-  } else {
-    char *Argums[3] = {(char *)"-a"};
-    cout << "printed from child process " << getpid() << endl;
-    execve("ncpdq", Argums, NULL);
-  }
-  const int Duracion = 2;
-  clock_t TActual = Timestamp();
-  clock_t Final = TActual + Duracion * (double)CLOCKS_PER_SEC;
-  int Estado;
-
-  kill(getpid(), 15); // SIGTERM
-  while (TActual < Final) {
-    Estado = kill(getpid(), -0);
-    if (Estado == 0)
-      break;
-    // Source - https://stackoverflow.com/a/72274580
-    // Posted by eerorika, modified by community. See post 'Timeline' for change
-    // history Retrieved 2026-08-07, License - CC BY-SA 4.01    
-    this_thread::sleep_for(chrono::milliseconds(100));
-    TActual = Timestamp();
-  }
-  if (TActual <= Final)
-    kill(getpid(), 9); // SIGKILL
-
   // ncpdq - a lon, lev, lat - v three_dmn_var in.nc out.nc
-  // alglib::real_1d_array bb; bb.setcontent(ae_int_t iLen, const double
-  // *pContent); alglib::spline1dconvdiffcubic());
 
   status = nc_close(ncid);
 }
@@ -219,5 +220,4 @@ clock_t Timestamp() {
   clock_gettime(CLOCK_MONOTONIC, &tw1); // POSIX; use timespec_get in C11
   clock_t t1 = clock();
   return t1;
-  ;
 }
