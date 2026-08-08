@@ -5,19 +5,15 @@
 #include <algorithm>
 #include <bits/stdc++.h>
 #include <cctype>
-#include <chrono>
-#include <csignal>
 #include <cstddef>
 #include <cstring>
 #include <ctime>
 #include <exception>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
-#include <thread>
 #include <time.h>
 #include <unistd.h>
 
@@ -30,13 +26,13 @@ inline void rtrim(std::string &s);
 clock_t Timestamp();
 
 int main(int, char **) {
-  std::cout << "Hello, from test!\n";
+  //std::cout << "Hello, from test!\n";
   string Ruta, NomFich, NomVar;
   double LBound = -1, RBound = -1;
   int Ntimes = 3, TipoSp = -1;
   int var_id, var_ndims, var_dimids[NC_MAX_VAR_DIMS], var_natts;
   nc_type var_type;
-  int status, ncid;
+  int status, ncid, ncid_out;
   string Nombres[3];
   size_t Tamanhos[3];
   double data_val_d;
@@ -52,9 +48,9 @@ int main(int, char **) {
     if (config.is_open()) {
       while (getline(config, cadena)) {
         if (Iterador == 0) {
-          NomFich = cadena;
-        } else if (Iterador == 1) {
           Ruta = cadena;
+        } else if (Iterador == 1) {
+          NomFich = cadena;
         } else if (Iterador == 2) {
           Ntimes = stoi(cadena);
         } else if (Iterador == 3) {
@@ -84,21 +80,19 @@ int main(int, char **) {
               RBound = stod(token);
             else
               break;
-
             Iterador_2++;
           }
         } else
           break;
-
         Iterador++;
       }
     }
     if (Ruta.back() != '/')
       Ruta += "/";
+    string InFich = Ruta + NomFich;
     size_t Punto = NomFich.find_last_of('.');
-    string NomFich2 = NomFich.insert(Punto - 1, "_Dif");
-    string InFich = Ruta + "/" + NomFich;
-    string OutFich = Ruta + "/" + NomFich2;
+    string NomFich2 = NomFich.insert(Punto - 1, "_Dif");    
+    string OutFich = Ruta + NomFich2;
     filesystem::copy_file(InFich, OutFich);
 
     char inruta[InFich.length() + 1];
@@ -134,13 +128,23 @@ int main(int, char **) {
       rtrim(Nombres[i]);
       Tamanhos[i] = recs;
     }
-    double Datas[Tamanhos[0]], Abscisas[Tamanhos[0]];
+    size_t Tamanho;
+    if (Ntimes < Tamanhos[0])
+      Tamanho = Ntimes;
+    else
+      Tamanho = Tamanhos[0];
+
+    double Datas[Tamanho], Abscisas[Tamanho];
+
+    status = nc_open(outruta, NC_WRITE, &ncid_out);
+    if (status != NC_NOERR)
+      handle_error(status, 5);
 
     for (int i = 0; i < Tamanhos[1]; i++) {
       var_index[1] = i;
       for (int m = 0; m < Tamanhos[2]; m++) {
         var_index[2] = m;
-        for (int n = 0; n < Tamanhos[0]; n++) {
+        for (int n = 0; n < Tamanho; n++) {
           Abscisas[n] = n;
           var_index[0] = n;
           if (var_type == NC_FLOAT) {
@@ -148,49 +152,64 @@ int main(int, char **) {
             Datas[n] = data_val_f;
           } else if (var_type == NC_DOUBLE) {
             status = nc_get_var1_double(ncid, var_id, var_index, &data_val_d);
-            Datas[n] = data_val_f;
+            Datas[n] = data_val_d;
           } else if (var_type == NC_INT) {
             status = nc_get_var1_int(ncid, var_id, var_index, &data_val_i);
-            Datas[n] = data_val_f;
+            Datas[n] = data_val_i;
           }
           if (status != NC_NOERR)
-            handle_error(status, 5);
+            handle_error(status, 6);
         }
         alglib::real_1d_array data;
-        data.setcontent(Tamanhos[0], Datas);
+        data.setcontent(Tamanho, Datas);
         alglib::real_1d_array abscisas;
-        data.setcontent(Tamanhos[0], Abscisas);
+        abscisas.setcontent(Tamanho, Abscisas);
         alglib::real_1d_array yes, dyes;
 
         if (TipoSp == 1) { // Parabólica
-          alglib::spline1dconvdiffcubic(abscisas, data, Tamanhos[0], 0, 0, 0, 0,
-                                        abscisas, Tamanhos[0], yes, dyes);
+          alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 0, 0, 0, 0,
+                                        abscisas, Tamanho, yes, dyes);
         }
         if (TipoSp == 2) { // Natural
-          alglib::spline1dconvdiffcubic(abscisas, data, Tamanhos[0], 2, 0, 2, 0,
-                                        abscisas, Tamanhos[0], yes, dyes);
+          alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 2, 0, 2, 0,
+                                        abscisas, Tamanho, yes, dyes);
         }
         if (TipoSp == 3) { // Clamped1d
-          alglib::spline1dconvdiffcubic(abscisas, data, Tamanhos[0], 1, LBound,
-                                        1, RBound, abscisas, Tamanhos[0], yes,
-                                        dyes);
+          alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 1, LBound, 1,
+                                        RBound, abscisas, Tamanho, yes, dyes);
         }
         if (TipoSp == 4) { // Clamped2d
-          alglib::spline1dconvdiffcubic(abscisas, data, Tamanhos[0], 2, LBound,
-                                        2, RBound, abscisas, Tamanhos[0], yes,
-                                        dyes);
+          alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 2, LBound, 2,
+                                        RBound, abscisas, Tamanho, yes, dyes);
         }
-        // status = nc_put_var1_double(ncid, rh_id, rh_index, &rh_val);
         if (status != NC_NOERR)
           handle_error(status, 6);
+
+        for (int n = 0; n < Tamanho; n++) {
+          var_index[0] = n;
+          data_val_d = dyes.getcontent()[n];
+          data_val_f = (float)dyes.getcontent()[n];
+          data_val_i = (int)dyes.getcontent()[n];
+
+          if (var_type == NC_FLOAT) {
+            status =
+                nc_put_var1_float(ncid_out, var_id, var_index, &data_val_f);
+          } else if (var_type == NC_DOUBLE) {
+            status =
+                nc_put_var1_double(ncid_out, var_id, var_index, &data_val_d);
+          } else if (var_type == NC_INT) {
+            status = nc_put_var1_int(ncid_out, var_id, var_index, &data_val_i);
+          }
+          if (status != NC_NOERR)
+            handle_error(status, 6);
+        }
       }
+      status = nc_close(ncid_out);
+      status = nc_close(ncid);
     }
   } catch (exception e) {
     exit(EXIT_FAILURE);
   }
-  // ncpdq - a lon, lev, lat - v three_dmn_var in.nc out.nc
-
-  status = nc_close(ncid);
 }
 
 inline char to_uppercase(unsigned char c) { return toupper(c); }
@@ -210,8 +229,7 @@ inline void ltrim(std::string &s) {
 inline void rtrim(std::string &s) {
   s.erase(std::find_if(s.rbegin(), s.rend(),
                        [](unsigned char ch) { return !std::isspace(ch); })
-              .base(),
-          s.end());
+              .base(), s.end());
 }
 
 clock_t Timestamp() {

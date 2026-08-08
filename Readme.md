@@ -36,7 +36,7 @@ La entrada será el fichero Netcdf con al menos una variable con esas tres dimen
 
 2. Nombre del fichero con extensión incluida.
 
-3. Si se quiere limitar el alcance temporal del fichero, un valor entero indicando el número de datos de la dimensión tiempo a considerar. Deben ser más de tres y no deben superar el alcance máximo definido en él.
+3. Si se quiere limitar el alcance temporal del fichero, un valor entero indicando el número de datos de la dimensión tiempo a considerar. Deben ser más de tres y no deben superar el alcance máximo definido en él. **Si no se quiere limitar -1**.
 
 4. Nombre de la variable contenida en el fichero.
 
