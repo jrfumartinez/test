@@ -2,8 +2,19 @@
     "version": 8,
     "configurePresets": [
         {
-            "name": "GCC 15.2.0 x86_64-unknown-linux-gnu",
-            "displayName": "GCC 15.2.0 x86_64-unknown-linux-gnu",
+            "name": "GCC 15.3.1 x86_64-redhat-linux",
+            "displayName": "GCC 15.3.1 x86_64-redhat-linux",
+            "description": "Uso de compiladores: C = /usr/bin/gcc-15",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_C_COMPILER": "/usr/bin/gcc-15",
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "GCC 16.1.1 x86_64-redhat-linux",
+            "displayName": "GCC 16.1.1 x86_64-redhat-linux",
             "description": "Uso de compiladores: C = /usr/bin/gcc, CXX = /usr/bin/g++",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {

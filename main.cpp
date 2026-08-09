@@ -5,12 +5,14 @@
 #include <algorithm>
 #include <bits/stdc++.h>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <ctime>
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <ostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -26,7 +28,7 @@ inline void rtrim(std::string &s);
 clock_t Timestamp();
 
 int main(int, char **) {
-  //std::cout << "Hello, from test!\n";
+  // std::cout << "Hello, from test!\n";
   string Ruta, NomFich, NomVar;
   double LBound = -1, RBound = -1;
   int Ntimes = 3, TipoSp = -1;
@@ -91,9 +93,9 @@ int main(int, char **) {
       Ruta += "/";
     string InFich = Ruta + NomFich;
     size_t Punto = NomFich.find_last_of('.');
-    string NomFich2 = NomFich.insert(Punto - 1, "_Dif");    
+    string NomFich2 = NomFich.insert(Punto - 1, "_Dif");
     string OutFich = Ruta + NomFich2;
-    filesystem::copy_file(InFich, OutFich);
+    filesystem::copy(InFich, OutFich);
 
     char inruta[InFich.length() + 1];
     strcpy(inruta, InFich.c_str());
@@ -102,7 +104,7 @@ int main(int, char **) {
     char nomvar[NomVar.length() + 1];
     strcpy(nomvar, NomVar.c_str());
 
-    status = nc_open(inruta, 0, &ncid);
+    status = nc_open(inruta, NC_WRITE, &ncid);
     if (status != NC_NOERR)
       handle_error(status, 1);
     status = nc_inq_varid(ncid, nomvar, &var_id);
@@ -129,7 +131,7 @@ int main(int, char **) {
       Tamanhos[i] = recs;
     }
     size_t Tamanho;
-    if (Ntimes < Tamanhos[0])
+    if (Ntimes < Tamanhos[0] && Ntimes > 2)
       Tamanho = Ntimes;
     else
       Tamanho = Tamanhos[0];
@@ -149,12 +151,18 @@ int main(int, char **) {
           var_index[0] = n;
           if (var_type == NC_FLOAT) {
             status = nc_get_var1_float(ncid, var_id, var_index, &data_val_f);
+            if (isnan(data_val_f))
+              data_val_f = 0.0f;
             Datas[n] = data_val_f;
           } else if (var_type == NC_DOUBLE) {
             status = nc_get_var1_double(ncid, var_id, var_index, &data_val_d);
+            if (isnan(data_val_d))
+              data_val_d = 0.0;
             Datas[n] = data_val_d;
           } else if (var_type == NC_INT) {
             status = nc_get_var1_int(ncid, var_id, var_index, &data_val_i);
+            if (isnan(data_val_i))
+              data_val_i = 0;
             Datas[n] = data_val_i;
           }
           if (status != NC_NOERR)
@@ -166,12 +174,12 @@ int main(int, char **) {
         abscisas.setcontent(Tamanho, Abscisas);
         alglib::real_1d_array yes, dyes;
 
-        if (TipoSp == 1) { // Parabólica
-          alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 0, 0, 0, 0,
+        if (TipoSp == 1) { // Natural
+          alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 2, 0, 2, 0,
                                         abscisas, Tamanho, yes, dyes);
         }
-        if (TipoSp == 2) { // Natural
-          alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 2, 0, 2, 0,
+        if (TipoSp == 2) { // Parabólica
+          alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 0, 0, 0, 0,
                                         abscisas, Tamanho, yes, dyes);
         }
         if (TipoSp == 3) { // Clamped1d
@@ -186,18 +194,21 @@ int main(int, char **) {
           handle_error(status, 6);
 
         for (int n = 0; n < Tamanho; n++) {
+
           var_index[0] = n;
-          data_val_d = dyes.getcontent()[n];
-          data_val_f = (float)dyes.getcontent()[n];
-          data_val_i = (int)dyes.getcontent()[n];
 
           if (var_type == NC_FLOAT) {
+            data_val_f = (float)dyes.getcontent()[n];
+            if (data_val_f > 0.0f)
+              cout << data_val_f << ", ";
             status =
                 nc_put_var1_float(ncid_out, var_id, var_index, &data_val_f);
           } else if (var_type == NC_DOUBLE) {
+            data_val_d = dyes.getcontent()[n];
             status =
                 nc_put_var1_double(ncid_out, var_id, var_index, &data_val_d);
           } else if (var_type == NC_INT) {
+            data_val_i = (int)dyes.getcontent()[n];
             status = nc_put_var1_int(ncid_out, var_id, var_index, &data_val_i);
           }
           if (status != NC_NOERR)
@@ -208,6 +219,7 @@ int main(int, char **) {
       status = nc_close(ncid);
     }
   } catch (exception e) {
+    cout << e.what() << endl;
     exit(EXIT_FAILURE);
   }
 }
@@ -229,7 +241,8 @@ inline void ltrim(std::string &s) {
 inline void rtrim(std::string &s) {
   s.erase(std::find_if(s.rbegin(), s.rend(),
                        [](unsigned char ch) { return !std::isspace(ch); })
-              .base(), s.end());
+              .base(),
+          s.end());
 }
 
 clock_t Timestamp() {
