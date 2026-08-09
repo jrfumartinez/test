@@ -47,6 +47,9 @@ La entrada será el fichero Netcdf con al menos una variable con esas tres dimen
 Se incluye un fichero con este contenido para poder servir de plantilla.
 La salida del programa sera el nombre del de entrada con un sufijo añadido "_\_Dif_" en la misma ruta.
 
+##Todo##     
+Incluir un archivo de información con indicaciones de datos que se escriben y cuantos hay diferentes a Fillvalues.
+
 ---
 
 J.R.Fuentes Martinez   (Spain)    July 2026
