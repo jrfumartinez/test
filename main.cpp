@@ -71,7 +71,7 @@ int main(int, char **) {
           }
           if (TipoSp == -1)
             throw "err: No hay un tipo válido de spline.";
-        } else if (Iterador == 5 && TipoSp == 3) {
+        } else if (Iterador == 5 && (TipoSp == 3 | TipoSp == 4)) {
           stringstream Cadena(cadena);
           string token;
           int Iterador_2 = 0;
