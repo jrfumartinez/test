@@ -47,6 +47,14 @@ La entrada será el fichero Netcdf con al menos una variable con esas tres dimen
 Se incluye un fichero con este contenido para poder servir de plantilla.
 La salida del programa sera el nombre del de entrada con un sufijo añadido "_\_Dif_" en la misma ruta.
 
+### Todo   
+
+1. Se va a revisar la gestión de Fillvalues.
+
+2. Se incluirá un fichero de información de lo que se realiza en el fivchero de salida desde el de entrada.
+
+3. Se permitirá una cuarta dimensión con un solo valor asignado.
+
 ---
 
 J.R.Fuentes Martinez   (Spain)    July 2026
