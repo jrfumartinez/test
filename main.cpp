@@ -26,6 +26,7 @@ void handle_error(int status, int Paso);
 inline void ltrim(std::string &s);
 inline void rtrim(std::string &s);
 clock_t Timestamp();
+template <class tipo> void findMinMax(tipo arr[], int n, tipo *max, tipo *min);
 
 int main(int, char **) {
   // std::cout << "Hello, from test!\n";
@@ -95,6 +96,8 @@ int main(int, char **) {
     size_t Punto = NomFich.find_last_of('.');
     string NomFich2 = NomFich.insert(Punto - 1, "_Dif");
     string OutFich = Ruta + NomFich2;
+    if (filesystem::exists(NomFich2))
+      throw "err: El fichero destino ya existe";
     filesystem::copy(InFich, OutFich);
 
     char inruta[InFich.length() + 1];
@@ -104,7 +107,7 @@ int main(int, char **) {
     char nomvar[NomVar.length() + 1];
     strcpy(nomvar, NomVar.c_str());
 
-    status = nc_open(inruta, NC_WRITE, &ncid);
+    status = nc_open(inruta, NC_NOWRITE, &ncid);
     if (status != NC_NOERR)
       handle_error(status, 1);
     status = nc_inq_varid(ncid, nomvar, &var_id);
@@ -137,6 +140,11 @@ int main(int, char **) {
       Tamanho = Tamanhos[0];
 
     double Datas[Tamanho], Abscisas[Tamanho];
+    double G_vr_val[2];
+    bool chivato[3] = {false, false, false};
+    size_t NReg_Tratados, NReg_excluidos;
+    const size_t NReg_total = Tamanhos[0] * Tamanhos[1] * Tamanhos[2];
+    double max, min, Max, Min;
 
     status = nc_open(outruta, NC_WRITE, &ncid_out);
     if (status != NC_NOERR)
@@ -150,23 +158,75 @@ int main(int, char **) {
           Abscisas[n] = n;
           var_index[0] = n;
           if (var_type == NC_FLOAT) {
+            float vr_val[2], fill_val;
+            if (!chivato[0]) {
+              /* get attribute values */
+              status = nc_get_att_float(ncid, var_id, "valid_range", vr_val);
+              if (status != NC_NOERR)
+                handle_error(status, 6);
+              status = nc_get_att_float(ncid, var_id, "_FillValue", &fill_val);
+              if (status != NC_NOERR)
+                handle_error(status, 7);
+              for (int v = 0; v < 2; v++) {
+                G_vr_val[v] = vr_val[v];
+              }
+              chivato[0] = true;
+            }
             status = nc_get_var1_float(ncid, var_id, var_index, &data_val_f);
-            if (isnan(data_val_f))
-              data_val_f = 0.0f;
+            if (status != NC_NOERR)
+              handle_error(status, 12);
+            if (isnan(data_val_f) || data_val_f == fill_val)
+              break;
             Datas[n] = data_val_f;
+            NReg_Tratados++;
+            NReg_excluidos = NReg_total - NReg_Tratados;
           } else if (var_type == NC_DOUBLE) {
+            double vr_val[2], fill_val;
+            if (!chivato[0]) {
+              /* get attribute values */
+              status = nc_get_att_double(ncid, var_id, "valid_range", vr_val);
+              if (status != NC_NOERR)
+                handle_error(status, 8);
+              status = nc_get_att_double(ncid, var_id, "_FillValue", &fill_val);
+              if (status != NC_NOERR)
+                handle_error(status, 9);
+              for (int v = 0; v < 2; v++) {
+                G_vr_val[v] = vr_val[v];
+              }
+              chivato[0] = true;
+            }
             status = nc_get_var1_double(ncid, var_id, var_index, &data_val_d);
-            if (isnan(data_val_d))
-              data_val_d = 0.0;
+            if (status != NC_NOERR)
+              handle_error(status, 12);
+            if (isnan(data_val_d) || data_val_d == fill_val)
+              break;
             Datas[n] = data_val_d;
+            NReg_Tratados++;
+            NReg_excluidos = NReg_total - NReg_Tratados;
           } else if (var_type == NC_INT) {
+            int vr_val[2], fill_val;
+            if (!chivato[0]) {
+              /* get attribute values */
+              status = nc_get_att_int(ncid, var_id, "valid_range", vr_val);
+              if (status != NC_NOERR)
+                handle_error(status, 10);
+              status = nc_get_att_int(ncid, var_id, "_FillValue", &fill_val);
+              if (status != NC_NOERR)
+                handle_error(status, 11);
+              for (int v = 0; v < 2; v++) {
+                G_vr_val[v] = vr_val[v];
+              }
+              chivato[0] = true;
+            }
             status = nc_get_var1_int(ncid, var_id, var_index, &data_val_i);
-            if (isnan(data_val_i))
-              data_val_i = 0;
+            if (status != NC_NOERR)
+              handle_error(status, 12);
+            if (isnan(data_val_i) || data_val_i == fill_val)
+              break;
             Datas[n] = data_val_i;
+            NReg_Tratados++;
+            NReg_excluidos = NReg_total - NReg_Tratados;
           }
-          if (status != NC_NOERR)
-            handle_error(status, 6);
         }
         alglib::real_1d_array data;
         data.setcontent(Tamanho, Datas);
@@ -190,13 +250,19 @@ int main(int, char **) {
           alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 2, LBound, 2,
                                         RBound, abscisas, Tamanho, yes, dyes);
         }
-        if (status != NC_NOERR)
-          handle_error(status, 6);
-
+        findMinMax<double>(dyes.getcontent(), Tamanho, &max, &min);
+        if (!chivato[1]) {
+          Min = min;
+          Max = max;
+          chivato[1] = true;
+        } else {
+          if (max > Max)
+            Max = max;
+          if (min < Min)
+            Min = min;
+        }
         for (int n = 0; n < Tamanho; n++) {
-
           var_index[0] = n;
-
           if (var_type == NC_FLOAT) {
             data_val_f = (float)dyes.getcontent()[n];
             if (data_val_f > 0.0f)
@@ -230,8 +296,8 @@ void handle_error(int status, int Paso) {}
 
 // Source - https://stackoverflow.com/a/217605
 // Posted by Evan Teran, modified by community. See post 'Timeline' for change
-// history Retrieved 2026-08-07, License - CC BY-SA 4.0 Trim from the start (in
-// place)
+// history Retrieved 2026-08-07, License - CC BY-SA 4.0 Trim from the start
+// (in place)
 inline void ltrim(std::string &s) {
   s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
             return !std::isspace(ch);
@@ -251,4 +317,14 @@ clock_t Timestamp() {
   clock_gettime(CLOCK_MONOTONIC, &tw1); // POSIX; use timespec_get in C11
   clock_t t1 = clock();
   return t1;
+}
+
+template <class tipo> void findMinMax(tipo arr[], int n, tipo *max, tipo *min) {
+  *min = arr[0]; // Itera a través del array desde el segundo elemento
+  for (int i = 1; i < n; i++) { // Actualiza el máximo si arr[i] es mayor
+    if (arr[i] > *max)
+      *max = arr[i]; // Actualiza el mínimo si arr[i] es menor
+    if (arr[i] < *min)
+      *min = arr[i];
+  }
 }
