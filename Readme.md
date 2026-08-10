@@ -28,32 +28,26 @@ Esta programa es un desarrollo realizado por una persona física y con solo un i
 
 En la derivación se utiliza por eficiencia una función que realiza en el mismo proceso interpolación y derivación, en el que aún siendo posible que el resultado posea otra granularidad distinta a la de entrada, se utiliza la misma. 
 
-En cuanto al necesario array de valores de tiempo como abscisas, se realiza una simplificación a valores de conteo consecutivo con incremento de la unidad, desde *n=0* hasta el valor final temporal del fichero. Se incorporará la opción de solucionar los límites de la spline de forma natural,parabólica y por valores restringidos conocidos de primera y segunda derivada.
+En cuanto al necesario array de valores de tiempo como abscisas, se realiza una simplificación a valores de conteo consecutivo con incremento de la unidad, desde *n=0* hasta el valor final temporal del fichero. Se incorporará la opción de solucionar los límites de la spline de forma natural, parabólica y por valores restringidos conocidos de primera y segunda derivada.
 
-La entrada será el fichero Netcdf con al menos una variable con esas tres dimensiones y un fichero de definición que se puede rellenar con cualquier editor de texto.  En este fichero, de nombre *diffmotion.cfig* , en el mismo directorio del programa, se incluirá al menos estos valores en filas terminadas por caracter de linea:
+La entrada será el fichero Netcdf con al menos una variable con esas tres dimensiones y un fichero de definición que se puede rellenar con cualquier editor de texto.  En este fichero, de nombre *DiffMotion.cfig* , en el mismo directorio del programa, se incluirá al menos estos valores en filas terminadas por caracter de linea:
 
 1. Ruta del fichero.
-
 2. Nombre del fichero con extensión incluida.
-
-3. Si se quiere limitar el alcance temporal del fichero, un valor entero indicando el número de datos de la dimensión tiempo a considerar. Deben ser más de tres y no deben superar el alcance máximo definido en él. **Si no se quiere limitar -1**.
-
+3. Si se quiere limitar el alcance temporal del fichero, un valor entero indicando el número de datos de la dimensión tiempo a considerar. Deben ser más de tres y no deben superar el alcance máximo definido en él. Si no se quiere limitar -1.
 4. Nombre de la variable contenida en el fichero.
-
 5. Tipo de limitación de bordes: *natural* | *parabolic* | *clamped_1d* | *clamped_2d*  (una a elegir) . 
-
 6. Si se elige *clamped*, el valor del borde izquierdo y derecho separado por punto y coma. En otro caso cualquier valor o ninguno.
 
 Se incluye un fichero con este contenido para poder servir de plantilla.
 La salida del programa sera el nombre del de entrada con un sufijo añadido "_\_Dif_" en la misma ruta.
 
+---
+
 ### Todo   
 
-1. Se va a revisar la gestión de Fillvalues.
-
-2. Se incluirá un fichero de información de lo que se realiza en el fivchero de salida desde el de entrada.
-
-3. Se permitirá una cuarta dimensión con un solo valor asignado.
+1. Se incluirá un fichero de información de lo que se realiza en el fichero de salida desde el de entrada.
+2. Se permitirá una cuarta dimensión con un solo valor asignado.
 
 ---
 
