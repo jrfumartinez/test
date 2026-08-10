@@ -45,7 +45,7 @@ int main(int, char **) {
 
   try {
 
-//Obtención de los datos del fichero de configuración.
+    // Obtención de los datos del fichero de configuración.
     ifstream config("DiffMotion.cfig");
     string cadena;
     int Iterador = 0;
@@ -91,9 +91,9 @@ int main(int, char **) {
         Iterador++;
       }
     }
-// Fin de Obtención de los datos del fichero de configuración.
+    // Fin de Obtención de los datos del fichero de configuración.
 
-// Generar los nombres de ficheros con ruta en string y char * .
+    // Generar los nombres de ficheros con ruta en string y char * .
     if (Ruta.back() != '/')
       Ruta += "/";
     string InFich = Ruta + NomFich;
@@ -109,9 +109,9 @@ int main(int, char **) {
     strcpy(outruta, OutFich.c_str());
     char nomvar[NomVar.length() + 1];
     strcpy(nomvar, NomVar.c_str());
-// Fin de Generar los nombres de ficheros con ruta en string y char * .
+    // Fin de Generar los nombres de ficheros con ruta en string y char * .
 
-// Obtener acceso al fichero de entrada, la variable y sus dimensiones.
+    // Obtener acceso al fichero de entrada, la variable y sus dimensiones.
     status = nc_open(inruta, NC_NOWRITE, &ncid);
     if (status != NC_NOERR)
       handle_error(status, 1);
@@ -143,12 +143,13 @@ int main(int, char **) {
       Tamanho = Ntimes;
     else
       Tamanho = Tamanhos[0];
-//Fin de Obtener acceso al fichero den entrada, la variable y sus dimensiones.
+    // Fin de Obtener acceso al fichero den entrada, la variable y sus
+    // dimensiones.
 
-//Bucle principal de iteración por dimensiones.
+    // Bucle principal de iteración por dimensiones.
     double Datas[Tamanho], Abscisas[Tamanho];
     double G_vr_val[2];
-    bool chivato[3] = {false, false, false};
+    bool chivato[3] = {false, false, false}, roto = false;
     size_t NReg_Tratados, NReg_excluidos;
     const size_t NReg_total = Tamanhos[0] * Tamanhos[1] * Tamanhos[2];
     double max, min, Max, Min;
@@ -166,7 +167,7 @@ int main(int, char **) {
           Abscisas[n] = n;
           var_index[0] = n;
 
-          //Se realizan las mismas acciones para tipos FLOAT, DOUBLE e INT
+          // Se realizan las mismas acciones para tipos FLOAT, DOUBLE e INT
           if (var_type == NC_FLOAT) {
 
             float vr_val[2], fill_val;
@@ -186,8 +187,10 @@ int main(int, char **) {
             status = nc_get_var1_float(ncid, var_id, var_index, &data_val_f);
             if (status != NC_NOERR)
               handle_error(status, 12);
-            if (isnan(data_val_f) || data_val_f == fill_val)
+            if (isnan(data_val_f) || data_val_f == fill_val) {
+              roto = true;
               break;
+            }
             Datas[n] = data_val_f;
             NReg_Tratados++;
             NReg_excluidos = NReg_total - NReg_Tratados;
@@ -197,7 +200,6 @@ int main(int, char **) {
             double vr_val[2], fill_val;
             // Operación a realizar una sola vez al comienzo.
             if (!chivato[0]) {
-              /* get attribute values */
               status = nc_get_att_double(ncid, var_id, "valid_range", vr_val);
               if (status != NC_NOERR)
                 handle_error(status, 8);
@@ -212,18 +214,19 @@ int main(int, char **) {
             status = nc_get_var1_double(ncid, var_id, var_index, &data_val_d);
             if (status != NC_NOERR)
               handle_error(status, 12);
-            if (isnan(data_val_d) || data_val_d == fill_val)
+            if (isnan(data_val_d) || data_val_d == fill_val) {
+              roto = true;
               break;
+            }
             Datas[n] = data_val_d;
             NReg_Tratados++;
             NReg_excluidos = NReg_total - NReg_Tratados;
-          
+
           } else if (var_type == NC_INT) {
 
             int vr_val[2], fill_val;
             // Operación a realizar una sola vez al comienzo.
             if (!chivato[0]) {
-              /* get attribute values */
               status = nc_get_att_int(ncid, var_id, "valid_range", vr_val);
               if (status != NC_NOERR)
                 handle_error(status, 10);
@@ -238,15 +241,20 @@ int main(int, char **) {
             status = nc_get_var1_int(ncid, var_id, var_index, &data_val_i);
             if (status != NC_NOERR)
               handle_error(status, 12);
-            if (isnan(data_val_i) || data_val_i == fill_val)
+            if (isnan(data_val_i) || data_val_i == fill_val) {
+               roto = true;
               break;
+            }
             Datas[n] = data_val_i;
             NReg_Tratados++;
             NReg_excluidos = NReg_total - NReg_Tratados;
           }
         }
-        // Los valores almacenados en Datas y Abscisas son los valores de entrada
-        // de la función de interpolación.
+        // Si ha salido del bucle por break, se le hace continuar.
+        if (roto) continue;
+        
+        // Los valores almacenados en Datas y Abscisas son los valores de
+        // entrada de la función de interpolación.
         alglib::real_1d_array data;
         data.setcontent(Tamanho, Datas);
         alglib::real_1d_array abscisas;
@@ -269,8 +277,8 @@ int main(int, char **) {
           alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 2, LBound, 2,
                                         RBound, abscisas, Tamanho, yes, dyes);
         }
-        //Se almacena el máximo y el mínimo para poder variar luego
-        //el atributo netcdf "valid-range" .
+        // Se almacena el máximo y el mínimo para poder variar luego
+        // el atributo netcdf "valid-range" .
         findMinMax<double>(dyes.getcontent(), Tamanho, &max, &min);
         if (!chivato[1]) {
           Min = min;
@@ -286,47 +294,54 @@ int main(int, char **) {
         for (int n = 0; n < Tamanho; n++) {
           var_index[0] = n;
 
-          //Se realizan las mismas acciones para tipos FLOAT, DOUBLE e INT
+          // Se realizan las mismas acciones para tipos FLOAT, DOUBLE e INT
           if (var_type == NC_FLOAT) {
             float vr_val[2];
-            //Esta operación de realiza una vez al comienzo.
+            // Esta operación de realiza una vez al comienzo.
             if (!chivato[2]) {
               vr_val[0] = (float)Max * 1.25f;
               vr_val[1] = (float)Min * 1.25f;
               /* get attribute values */
-              status = nc_put_att_float(ncid, var_id, "valid_range", NC_FLOAT, 2, vr_val);
+              status = nc_put_att_float(ncid, var_id, "valid_range", NC_FLOAT,
+                                        2, vr_val);
               if (status != NC_NOERR)
-                handle_error(status, 6);              
+                handle_error(status, 6);
               chivato[2] = true;
             }
             data_val_f = (float)dyes.getcontent()[n];
             status =
                 nc_put_var1_float(ncid_out, var_id, var_index, &data_val_f);
+
           } else if (var_type == NC_DOUBLE) {
+
             double vr_val[2];
-            //Esta operación de realiza una vez al comienzo.
+            // Esta operación de realiza una vez al comienzo.
             if (!chivato[2]) {
               vr_val[0] = Max * 1.25;
               vr_val[1] = Min * 1.25;
               /* get attribute values */
-              status = nc_put_att_double(ncid, var_id, "valid_range", NC_DOUBLE, 2, vr_val);
+              status = nc_put_att_double(ncid, var_id, "valid_range", NC_DOUBLE,
+                                         2, vr_val);
               if (status != NC_NOERR)
-                handle_error(status, 6);              
+                handle_error(status, 6);
               chivato[2] = true;
             }
             data_val_d = dyes.getcontent()[n];
             status =
                 nc_put_var1_double(ncid_out, var_id, var_index, &data_val_d);
+
           } else if (var_type == NC_INT) {
+            
             int vr_val[2];
-            //Esta operación de realiza una vez al comienzo.
+            // Esta operación de realiza una vez al comienzo.
             if (!chivato[2]) {
               vr_val[0] = (int)Max * 1.25;
               vr_val[1] = (int)Min * 1.25;
               /* get attribute values */
-              status = nc_put_att_int(ncid, var_id, "valid_range", NC_INT, 2, vr_val);
+              status = nc_put_att_int(ncid, var_id, "valid_range", NC_INT, 2,
+                                      vr_val);
               if (status != NC_NOERR)
-                handle_error(status, 6);              
+                handle_error(status, 6);
               chivato[2] = true;
             }
             data_val_i = (int)dyes.getcontent()[n];
@@ -340,11 +355,11 @@ int main(int, char **) {
         cout << "Total Registros tratados: " << NReg_Tratados << endl;
         cout << "Total Registros excluidos: " << NReg_excluidos << endl;
       }
-// Fin de Bucle principal de iteración por dimensiones.
-
-      status = nc_close(ncid_out);
-      status = nc_close(ncid);
     }
+    // Fin de Bucle principal de iteración por dimensiones.
+    status = nc_close(ncid_out);
+    status = nc_close(ncid);
+
   } catch (exception e) {
     cout << e.what() << endl;
     exit(EXIT_FAILURE);
