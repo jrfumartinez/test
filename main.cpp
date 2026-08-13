@@ -20,7 +20,6 @@
 #include <unistd.h>
 
 using namespace std;
-
 inline char to_uppercase(unsigned char c);
 void handle_error(int status, int Paso);
 inline void ltrim(std::string &s);
@@ -47,10 +46,12 @@ int main(int, char **) {
 
     // Obtención de los datos del fichero de configuración.
     ifstream config("DiffMotion.cfig");
-    string cadena;
+    string cadena = string(255, ' ');
     int Iterador = 0;
     if (config.is_open()) {
       while (getline(config, cadena)) {
+        rtrim(cadena);
+        ltrim(cadena);
         if (Iterador == 0) {
           Ruta = cadena;
         } else if (Iterador == 1) {
@@ -75,9 +76,11 @@ int main(int, char **) {
             throw "err: No hay un tipo válido de spline.";
         } else if (Iterador == 5 && (TipoSp == 3 | TipoSp == 4)) {
           stringstream Cadena(cadena);
-          string token;
+          string token = string(255, ' ');
           int Iterador_2 = 0;
           while (getline(Cadena, token, ',')) {
+            rtrim(cadena);
+            ltrim(cadena);
             if (Iterador_2 == 0)
               LBound = stod(token);
             else if (Iterador_2 == 1)
@@ -91,6 +94,7 @@ int main(int, char **) {
         Iterador++;
       }
     }
+    config.close();
     // Fin de Obtención de los datos del fichero de configuración.
 
     // Generar los nombres de ficheros con ruta en string y char * .
@@ -98,17 +102,14 @@ int main(int, char **) {
       Ruta += "/";
     string InFich = Ruta + NomFich;
     size_t Punto = NomFich.find_last_of('.');
-    string NomFich2 = NomFich.insert(Punto - 1, "_Dif");
+    string NomFich2 = NomFich.insert(Punto, "_Dif");
     string OutFich = Ruta + NomFich2;
     if (filesystem::exists(NomFich2))
       throw "err: El fichero destino ya existe";
     filesystem::copy(InFich, OutFich);
-    char inruta[InFich.length() + 1];
-    strcpy(inruta, InFich.c_str());
-    char outruta[OutFich.length() + 1];
-    strcpy(outruta, OutFich.c_str());
-    char nomvar[NomVar.length() + 1];
-    strcpy(nomvar, NomVar.c_str());
+    const char *inruta = InFich.c_str();
+    const char *outruta = OutFich.c_str();
+    const char *nomvar = NomVar.c_str();
     // Fin de Generar los nombres de ficheros con ruta en string y char * .
 
     // Obtener acceso al fichero de entrada, la variable y sus dimensiones.
@@ -150,11 +151,11 @@ int main(int, char **) {
     double Datas[Tamanho], Abscisas[Tamanho];
     double G_vr_val[2];
     bool chivato[3] = {false, false, false}, roto = false;
-    size_t NReg_Tratados, NReg_excluidos;
+    size_t NReg_Tratados = 0, NReg_excluidos = 0;
     const size_t NReg_total = Tamanhos[0] * Tamanhos[1] * Tamanhos[2];
     double max, min, Max, Min;
 
-    // Se accede al fichero de salida.
+    // Se crea el fichero de salida.
     status = nc_open(outruta, NC_WRITE, &ncid_out);
     if (status != NC_NOERR)
       handle_error(status, 5);
@@ -189,11 +190,11 @@ int main(int, char **) {
               handle_error(status, 12);
             if (isnan(data_val_f) || data_val_f == fill_val) {
               roto = true;
+              NReg_excluidos++;
               break;
             }
             Datas[n] = data_val_f;
             NReg_Tratados++;
-            NReg_excluidos = NReg_total - NReg_Tratados;
 
           } else if (var_type == NC_DOUBLE) {
 
@@ -215,12 +216,12 @@ int main(int, char **) {
             if (status != NC_NOERR)
               handle_error(status, 12);
             if (isnan(data_val_d) || data_val_d == fill_val) {
+              NReg_excluidos++;
               roto = true;
               break;
             }
             Datas[n] = data_val_d;
             NReg_Tratados++;
-            NReg_excluidos = NReg_total - NReg_Tratados;
 
           } else if (var_type == NC_INT) {
 
@@ -242,17 +243,19 @@ int main(int, char **) {
             if (status != NC_NOERR)
               handle_error(status, 12);
             if (isnan(data_val_i) || data_val_i == fill_val) {
-               roto = true;
+              NReg_excluidos++;
+              roto = true;
               break;
             }
             Datas[n] = data_val_i;
             NReg_Tratados++;
-            NReg_excluidos = NReg_total - NReg_Tratados;
           }
         }
         // Si ha salido del bucle por break, se le hace continuar.
-        if (roto) continue;
-        
+        if (roto) {
+          roto = false;
+          continue;
+        }
         // Los valores almacenados en Datas y Abscisas son los valores de
         // entrada de la función de interpolación.
         alglib::real_1d_array data;
@@ -277,6 +280,15 @@ int main(int, char **) {
           alglib::spline1dconvdiffcubic(abscisas, data, Tamanho, 2, LBound, 2,
                                         RBound, abscisas, Tamanho, yes, dyes);
         }
+        /*
+        double unarray[Tamanho];
+        double *puntero;
+        puntero = dyes.getcontent();
+        for (int bb = 0; bb < Tamanho; bb++) {
+          unarray[bb] = *puntero;
+          puntero++;
+        }
+        */
         // Se almacena el máximo y el mínimo para poder variar luego
         // el atributo netcdf "valid-range" .
         findMinMax<double>(dyes.getcontent(), Tamanho, &max, &min);
@@ -299,13 +311,23 @@ int main(int, char **) {
             float vr_val[2];
             // Esta operación de realiza una vez al comienzo.
             if (!chivato[2]) {
-              vr_val[0] = (float)Max * 1.25f;
-              vr_val[1] = (float)Min * 1.25f;
-              /* get attribute values */
-              status = nc_put_att_float(ncid, var_id, "valid_range", NC_FLOAT,
-                                        2, vr_val);
+              vr_val[0] = MAXFLOAT;
+              vr_val[1] = -MAXFLOAT;
+              status = nc_redef(ncid_out);
               if (status != NC_NOERR)
-                handle_error(status, 6);
+                handle_error(status, 13);
+
+              status = nc_put_att_float(ncid_out, var_id, "valid_max", NC_FLOAT,
+                                        1, &vr_val[0]);
+              if (status != NC_NOERR)
+                handle_error(status, 14);
+              status = nc_put_att_float(ncid_out, var_id, "valid_min", NC_FLOAT,
+                                        1, &vr_val[1]);
+              if (status != NC_NOERR)
+                handle_error(status, 15);
+              status = nc_enddef(ncid_out); /*leave define mode*/
+              if (status != NC_NOERR)
+                handle_error(status, 15);
               chivato[2] = true;
             }
             data_val_f = (float)dyes.getcontent()[n];
@@ -318,12 +340,17 @@ int main(int, char **) {
             // Esta operación de realiza una vez al comienzo.
             if (!chivato[2]) {
               vr_val[0] = Max * 1.25;
-              vr_val[1] = Min * 1.25;
-              /* get attribute values */
-              status = nc_put_att_double(ncid, var_id, "valid_range", NC_DOUBLE,
-                                         2, vr_val);
+              vr_val[1] = Min * 0.75;
+              status = nc_redef(ncid_out);
               if (status != NC_NOERR)
-                handle_error(status, 6);
+                handle_error(status, 16);
+              status = nc_put_att_double(ncid_out, var_id, "valid_range",
+                                         NC_DOUBLE, 2, vr_val);
+              if (status != NC_NOERR)
+                handle_error(status, 17);
+              status = nc_enddef(ncid_out); /*leave define mode*/
+              if (status != NC_NOERR)
+                handle_error(status, 18);
               chivato[2] = true;
             }
             data_val_d = dyes.getcontent()[n];
@@ -331,32 +358,63 @@ int main(int, char **) {
                 nc_put_var1_double(ncid_out, var_id, var_index, &data_val_d);
 
           } else if (var_type == NC_INT) {
-            
+
             int vr_val[2];
             // Esta operación de realiza una vez al comienzo.
             if (!chivato[2]) {
               vr_val[0] = (int)Max * 1.25;
-              vr_val[1] = (int)Min * 1.25;
-              /* get attribute values */
-              status = nc_put_att_int(ncid, var_id, "valid_range", NC_INT, 2,
-                                      vr_val);
+              vr_val[1] = (int)Min * 0.75;
+              status = nc_redef(ncid_out);
               if (status != NC_NOERR)
-                handle_error(status, 6);
+                handle_error(status, 19);
+              status = nc_put_att_int(ncid_out, var_id, "valid_range", NC_INT,
+                                      2, vr_val);
+              if (status != NC_NOERR)
+                handle_error(status, 20);
+              status = nc_enddef(ncid_out); /*leave define mode*/
+              if (status != NC_NOERR)
+                handle_error(status, 21);
               chivato[2] = true;
             }
             data_val_i = (int)dyes.getcontent()[n];
             status = nc_put_var1_int(ncid_out, var_id, var_index, &data_val_i);
           }
           if (status != NC_NOERR)
-            handle_error(status, 6);
+            handle_error(status, 22);
         }
-        cout << "Iteración " << var_index;
-        cout << "Total Registros: " << NReg_total << endl;
-        cout << "Total Registros tratados: " << NReg_Tratados << endl;
-        cout << "Total Registros excluidos: " << NReg_excluidos << endl;
       }
     }
     // Fin de Bucle principal de iteración por dimensiones.
+    if (var_type == NC_FLOAT) {
+      float vr_val[2];
+      vr_val[0] = Max * 1.1f;
+      vr_val[1] = Min * 0.9f;
+      status = nc_redef(ncid_out);
+      if (status != NC_NOERR)
+        handle_error(status, 13);
+      status = nc_put_att_float(ncid_out, var_id, "valid_max", NC_FLOAT, 1,
+                                &vr_val[0]);
+      if (status != NC_NOERR)
+        handle_error(status, 14);
+      status = nc_put_att_float(ncid_out, var_id, "valid_min", NC_FLOAT, 1,
+                                &vr_val[1]);
+      if (status != NC_NOERR)
+        handle_error(status, 15);
+      status = nc_enddef(ncid_out); /*leave define mode*/
+      if (status != NC_NOERR)
+        handle_error(status, 15);
+    }    
+    ofstream salida(Ruta + "info.out");
+    if (!salida.is_open())
+      throw "err: no se ha podido crear el fichero info de salida.";
+    salida << "Iteración " << "[" << var_index[0] << "," << var_index[1] << ","
+           << var_index[2] << "]" << endl;
+    salida << "Total Registros: " << NReg_total << endl;
+    salida << "Total Registros tratados: " << NReg_Tratados << endl;
+    salida << "Total Registros excluidos: " << NReg_excluidos << endl << endl;
+    salida << "Mínimo: " << Min << endl;
+    salida << "Máximo: " << Max << endl;
+    salida.close();
     status = nc_close(ncid_out);
     status = nc_close(ncid);
 
@@ -395,7 +453,8 @@ clock_t Timestamp() {
 }
 
 template <class tipo> void findMinMax(tipo arr[], int n, tipo *max, tipo *min) {
-  *min = arr[0]; // Itera a través del array desde el segundo elemento
+  *min = arr[0];
+  *max = arr[0];
   for (int i = 1; i < n; i++) { // Actualiza el máximo si arr[i] es mayor
     if (arr[i] > *max)
       *max = arr[i]; // Actualiza el mínimo si arr[i] es menor

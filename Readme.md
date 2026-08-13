@@ -14,7 +14,7 @@ Esto puede ser útil para la obtención de un fichero preparado para una represe
 
 Se utiliza para la programación el lenguaje C++ en entorno linux y con recursos de compilacion GCC y CMake. 
 
-La IDE utilizada es ***VSCodium*** y extensiones de ***CLang*** y depuración habituales.  La aplicación de cálculo algebraico e interpolación es la versión gratuita del programa ***Alglib*** para C++, bajo licencia GPL2+, que se adjunta al programa tal como se obtiene, sin modificación alguna. La librería de API de Netcdf es la de ***Unidata*** en la versión del gestor de paquetes de  Fedora 44. 
+La IDE utilizada es ***VSCodium*** y extensiones de ***CLang*** y depuración habituales.  La aplicación de cálculo algebraico e interpolación es la versión gratuita del programa ***Alglib*** para C++, bajo licencia GPL2+, que se adjunta al programa tal como se obtiene, sin modificación alguna. La librería de API de Netcdf es la de ***Unidata*** en la versión del gestor de paquetes de  Fedora 44. El ploteo se realiza con elprograma ***Panoply*** de ***NASA***. 
 
 ---
 
@@ -40,15 +40,26 @@ La entrada será el fichero Netcdf con al menos una variable con esas tres dimen
 6. Si se elige *clamped*, el valor del borde izquierdo y derecho separado por punto y coma. En otro caso cualquier valor o ninguno.
 
 Se incluye un fichero con este contenido para poder servir de plantilla.
-La salida del programa sera el nombre del de entrada con un sufijo añadido "_\_Dif_" en la misma ruta.
+La salida del programa sera el nombre del de entrada con un sufijo añadido "_\_Dif_" en la misma ruta y un fichero de información del proceso.
 
 ---
 
-### Todo   
+### Todo
 
-1. Se incluirá un fichero de información de lo que se realiza en el fichero de salida desde el de entrada.
-2. Se permitirá una cuarta dimensión con un solo valor asignado.
+1. Se permitirá una cuarta dimensión con un solo valor asignado.
+
+---
+
+### Primeros resultados
+
+<img src="images/sea_ice_fraction_in_METOFFICE-GLO-SST-L4-NRT-OBS-SST-V2_178621_original.svg" title="" alt="" data-align="center" />
+
+<img src="images/sea_ice_fraction_in_METOFFICE-GLO-SST-L4-NRT-OBS-SST-V2_178621.svg" title="" alt="" data-align="center" />   
+
+Los primeros seis valores temporales hallados. Las imagenes corresponden al primero de fecha 2026-07-06 .
 
 ---
 
 J.R.Fuentes Martinez   (Spain)    July 2026
+
+
